@@ -1,0 +1,19 @@
+---
+title: "Informe_Desempeño"
+author: "Área de Planificación Gestión y Estadística"
+date:  "`r format(Sys.Date(), '%d de %B de %Y') `"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(dplyr)
+library(kableExtra)
+
+```
+
+
+
+
+\pagebreak
