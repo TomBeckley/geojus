@@ -1,0 +1,387 @@
+---
+title: "Geomputation"
+author: "Tomás E. Beckley"
+date: "2022-08-08"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduccion a Spatial Data Analysis en R
+
+En este documento se pretende realizar una introduccion al analisis espacial a traves de R.
+Se utilizaran los siguientes paquetes:
+*sf: para la manipulacion de datos vectoriales en simple features
+*terra: para la manipuplacion de datos raster
+*spData: Contiene datasets geograficos para practicar
+
+```{r, message=FALSE}
+#install.packages("sf")
+#install.packages("terra")
+#install.packages("spData")
+#install.packages("spDataLarge", repos = "https://nowosad.r-universe.dev")
+```
+
+```{r, message=FALSE}
+library("sf")
+library("terra")
+library("spData")
+library("spDataLarge")
+library(dplyr)
+```
+
+```{r, message = FALSE}
+vignette(package = "sf") # see which vignettes are available
+vignette("sf1")          # an introduction to the package
+```
+
+Simple features son objetos compuestos por un data frame que tiene una columna denominada "geo" que contienen las coordenadas geometricas de ese feature.
+
+```{r}
+class(world)
+names(world)
+```
+Al llamar al objeto nos indica:
+* Metadatos: el tipo de feature que es, cantidad de entidades, sus dimensiones y sistemas de coordenadas.
+* Dataframe con los valores para cada variable
+
+```{r}
+world
+world$geom
+```
+
+Se puede plotear rapidamente un mapa con la funcion plot()
+```{r}
+plot(world)
+```
+
+Llamar determinadas filas y columnas.
+```{r}
+world_mini = world[1:2, 1:3]
+world_mini
+```
+
+
+El paquete "sf" posee una serie de ventajas respecto al antiguo "sp", ademas, este ultimo dejara de tener soporte desde el 2023. Ademas, el "sf" es compatible con "tidyverse".
+Se puede pasar de un formato a otro de la siguiente manera:
+
+```{r}
+library(sp)
+world_sp = as(world, "Spatial") # from an sf object to sp
+# sp functions ...
+world_sf = st_as_sf(world_sp)           # from sp to sf
+```
+
+*Estructura de un sf*
+Para construir desde cero un sf se necesita:
+* stg: determinar la geometria del feature e ingresar las coordenadas
+* sfc: luego se convierte en columna, en este paso se establece el sistema de referencia CRS
+* data.frame: se crea el data frame del feature
+* sf: finalmente se combina el data.frame con el sfc para obtener el sf final.
+
+```{r}
+lnd_point = st_point(c(0.1, 51.5))                 # sfg (sf geometry) object
+lnd_geom = st_sfc(lnd_point, crs = 4326)           # sfc (sf column) object
+lnd_attrib = data.frame(                           # data.frame object
+  name = "London",
+  temperature = 25,
+  date = as.Date("2017-06-21")
+  )
+lnd_sf = st_sf(lnd_attrib, geometry = lnd_geom)    # sf object
+plot(lnd_sf)
+```
+
+El paquete "sf" tiene activado por default el motor de geometria esferica "s2" de Google.
+Se lo puede apagar o prender segun se quiera, pero es necesario tenerlo prendido para que realice 
+correctamente los calculos.
+
+
+*Primeros mapas*
+Como se comento, se pueden crear mapas utilizando la funcion plot(), sin embargo, tiene ciertas limitaciones importantes.
+Para crear mapas mas complejos y mapas interactivos, se utiliza librerias especializadas como "tmap" y "leaflet"
+
+```{r}
+world_asia = world[world$continent == "Asia", ]
+asia = st_union(world_asia)
+```
+
+```{r}
+plot(world["pop"], reset = FALSE)
+plot(asia, add = TRUE, col = "red")
+```
+
+## Operaciones con los datos de atributos de un sf ##
+
+
+```{r}
+world[1:6, ]    # subset rows by position
+world[, 1:3]    # subset columns by position
+world[1:6, 1:3] # subset rows and columns by position
+world[, c("name_long", "pop")] # columns by name
+world[, c(T, T, F, F, F, F, F, T, T, F, F)] # by logical indices
+world[, 888] # an index representing a non-existent column
+```
+
+```{r}
+i_small = world$area_km2 < 10000
+summary(i_small) # a logical vector
+#>    Mode   FALSE    TRUE 
+#> logical     170       7
+small_countries = world[i_small, ]
+small_countries = world[world$area_km2 < 10000, ]
+small_countries = subset(world, area_km2 < 10000)
+small_countries
+```
+Es posible utilizar el paquete dplyr. Notar que en ambos casos la columna "geom" siempre se mantiene por mas que no la seleccionemos.
+
+Con "select" se seleccionan las columnas deseadas
+```{r}
+world1 = dplyr::select(world, name_long, pop)
+names(world1)
+#> [1] "name_long" "pop"       "geom"
+```
+
+Se puede utilizar el comando : para saber determinar desde y hasta que columna seleccionar
+```{r}
+world2 = dplyr::select(world, name_long:pop)
+```
+
+Se puede utilizar el "-" para eliminar ciertas columnas
+```{r}
+
+world3 = dplyr::select(world, -subregion, -area_km2)
+```
+
+Se pueden renombrar columnas facilmente
+```{r}
+world4 = dplyr::select(world, name_long, population = pop)
+world5 = world[, c("name_long", "pop")] # subset columns by name
+names(world5)[names(world5) == "pop"] = "population" # rename column manually
+```
+
+Obtener columnas en forma de vectores
+```{r}
+pull(world, pop)
+world$pop
+world[["pop"]]
+```
+
+La funcion slice para seleccionar filas
+```{r}
+slice(world, 1:6)
+```
+
+La funcion filter es el equivalente a la funcion subset
+```{r}
+world7 = filter(world ,area_km2 < 10000) # countries with a small area
+world7 = filter(world, lifeExp > 82)      # with high life expectancy
+```
+
+
+Se puede utilizar el comando pipe "%>%" o "|>" para encadenar funciones y generar un workflow
+
+```{r}
+world7 = world |>
+  filter(continent == "Asia") |>
+  dplyr::select(name_long, continent) |>
+  slice(1:5)
+```
+
+Se pueden utilizar funciones anidadas para llegar al mismo objetivo
+```{r}
+world8 = slice(
+  dplyr::select(
+    filter(world, continent == "Asia"),
+    name_long, continent),
+  1:5)
+```
+
+O se pueden realizar linea por linea distintas operaciones intermedias y almacenarlas en variables para luego poder analizarlas con el proposito de encontrar bugs.
+
+```{r}
+world9_filtered = filter(world, continent == "Asia")
+world9_selected = dplyr::select(world9_filtered, continent)
+world9 = slice(world9_selected, 1:5)
+```
+
+**Agregacion o agrupacion**
+Se puede utilizar la funcion aggregate para agrupar por variable
+Notar que el objeto obtenido NO ES ESPACIAL
+
+```{r}
+world_agg1 = aggregate(pop ~ continent, FUN = sum, data = world,
+                       na.rm = TRUE)
+class(world_agg1)
+world_agg1
+```
+Para agrupar y obtener un objeto espacial, se debe realizar de la siguiente forma:
+```{r}
+world_agg2 = aggregate(world["pop"], list(world$continent), FUN = sum, 
+                       na.rm = TRUE)
+class(world_agg2)
+#> [1] "sf"         "data.frame"
+nrow(world_agg2)
+#> [1] 8
+```
+
+Con comandos pipeline
+
+```{r}
+world_agg4  = world |> 
+  group_by(continent) |> 
+  summarize(pop = sum(pop, na.rm = TRUE), `area_sqkm` = sum(area_km2), n = n())
+```
+
+Resumen de distintas funciones utilizadas
+```{r}
+world_agg5 = world |> 
+  st_drop_geometry() |>                      # drop the geometry for speed
+  dplyr::select(pop, continent, area_km2) |> # subset the columns of interest  
+  group_by(continent) |>                     # group by continent and summarize:
+  summarize(Pop = sum(pop, na.rm = TRUE), Area = sum(area_km2), N = n()) |>
+  mutate(Density = round(Pop / Area)) |>     # calculate population density
+  slice_max(Pop, n = 3) |>                   # keep only the top 3
+  arrange(desc(N))                           # arrange in order of n. countries
+```
+
+**Hacer Joins**
+
+```{r}
+world_coffee = left_join(world, coffee_data)
+#> Joining, by = "name_long"
+class(world_coffee)
+#> [1] "sf"         "tbl_df"     "tbl"        "data.frame"
+```
+```{r}
+names(world_coffee)
+#>  [1] "iso_a2"                 "name_long"              "continent"             
+#>  [4] "region_un"              "subregion"              "type"                  
+#>  [7] "area_km2"               "pop"                    "lifeExp"               
+#> [10] "gdpPercap"              "geom"                   "coffee_production_2016"
+#> [13] "coffee_production_2017"
+plot(world_coffee["coffee_production_2017"])
+```
+
+**Inner Join**
+
+```{r}
+world_coffee_inner = inner_join(world, coffee_data)
+#> Joining, by = "name_long"
+nrow(world_coffee_inner)
+#> [1] 45
+```
+
+
+```{r}
+setdiff(coffee_data$name_long, world$name_long)
+#> [1] "Congo, Dem. Rep. of" "Others"
+```
+```{r}
+(drc = stringr::str_subset(world$name_long, "Dem*.+Congo"))
+#> [1] "Democratic Republic of the Congo"|
+```
+
+```{r}
+coffee_data$name_long[grepl("Congo,", coffee_data$name_long)] = drc
+world_coffee_match = inner_join(world, coffee_data)
+#> Joining, by = "name_long"
+nrow(world_coffee_match)
+#> [1] 46
+```
+## OPERACIONES ESPACIALES ##
+
+**Intersect**
+
+```{r}
+canterbury = nz |> filter(Name == "Canterbury")
+canterbury_height = nz_height[canterbury, ]
+
+```
+
+**No toca**
+
+```{r}
+nz_height[canterbury, , op = st_disjoint]
+```
+
+
+**Ejemplos**
+
+Se cren figuras para realizar los ejemplos
+Primero el poligono X
+
+```{r}
+polygon_matrix = cbind(
+  x = c(0, 0, 1, 1,   0),
+  y = c(0, 1, 1, 0.5, 0)
+)
+polygon_sfc = st_sfc(st_polygon(list(polygon_matrix)))
+```
+
+```{r}
+line_sfc = st_sfc(st_linestring(cbind(
+  x = c(0.4, 1),
+  y = c(0.2, 0.5)
+)))
+# create points
+point_df = data.frame(
+  x = c(0.2, 0.7, 0.4),
+  y = c(0.1, 0.2, 0.8)
+)
+point_sf = st_as_sf(point_df, coords = c("x", "y"))
+```
+
+1 - Que punto intersecta a X
+
+```{r}
+st_intersects(point_sf, polygon_sfc)
+```
+
+```{r}
+st_intersects(point_sf, polygon_sfc, sparse = FALSE)
+```
+
+```{r}
+st_within(point_sf, polygon_sfc)
+st_touches(point_sf, polygon_sfc)
+```
+```{r}
+st_disjoint(point_sf, polygon_sfc, sparse = FALSE)[, 1]
+```
+
+```{r}
+st_is_within_distance(point_sf, polygon_sfc, dist = 0.2, sparse = FALSE)[, 1]
+```
+
+```{r}
+st_distance(point_sf, polygon_sfc)
+```
+**Joins**
+
+```{r}
+set.seed(2018) # set seed for reproducibility
+(bb = st_bbox(world)) # the world's bounds
+#>   xmin   ymin   xmax   ymax 
+#> -180.0  -89.9  180.0   83.6
+random_df = data.frame(
+  x = runif(n = 10, min = bb[1], max = bb[3]),
+  y = runif(n = 10, min = bb[2], max = bb[4])
+)
+random_points = random_df |> 
+  st_as_sf(coords = c("x", "y")) |> # set coordinates
+  st_set_crs("EPSG:4326") # set geographic CRS
+```
+
+En este join se mantienen todos los puntos y se agregan los atributos a los puntos que coinciden con los paises
+```{r}
+world_random = world[random_points, ]
+nrow(world_random)
+#> [1] 4
+random_joined = st_join(random_points, world["name_long"])
+```
+
+
+
+
