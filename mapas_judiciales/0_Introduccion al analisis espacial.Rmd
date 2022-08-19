@@ -382,6 +382,58 @@ nrow(world_random)
 random_joined = st_join(random_points, world["name_long"])
 ```
 
+**Joins sin coincidencia perfecta**
+
+```{r}
+plot(st_geometry(cycle_hire), col = "blue")
+plot(st_geometry(cycle_hire_osm), add = TRUE, pch = 3, col = "red")
+```
+Chequeamos que no exista interseccion
+```{r}
+any(st_touches(cycle_hire, cycle_hire_osm, sparse = FALSE))
+```
+Hacemos un join estableciendo un minimo de distancia de 20
+```{r}
+sel = st_is_within_distance(cycle_hire, cycle_hire_osm, dist = 20)
+summary(lengths(sel) > 0)
+```
+Hay 438 coincidencias en donde cycle_hire cae dentro del radio de 20m de cycle_hire_osm
+
+Notar que hay mas elementos en z ya que varios elementos coinciden con mas de un radio
+```{r}
+z = st_join(cycle_hire, cycle_hire_osm, st_is_within_distance, dist = 20)
+nrow(cycle_hire)
+nrow(z)
+
+```
+
+Para eliminar esta duplicidad se procede a obtener el promedio
+```{r}
+z = z |> 
+  group_by(id) |> 
+  summarize(capacity = mean(capacity))
+nrow(z) == nrow(cycle_hire)
+```
 
 
+```{r}
+plot(cycle_hire_osm["capacity"])
+plot(z["capacity"])
+```
+
+**Agregate**
+
+```{r}
+nz_agg = aggregate(x = nz_height, by = nz, FUN = mean)
+```
+
+```{r}
+nz_agg2 = st_join(x = nz, y = nz_height) |>
+  group_by(Name) |>
+  summarize(elevation = mean(elevation, na.rm = TRUE))
+```
+
+```{r}
+plot(nz_agg2[2])
+```
 
