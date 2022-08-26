@@ -436,4 +436,144 @@ nz_agg2 = st_join(x = nz, y = nz_height) |>
 ```{r}
 plot(nz_agg2[2])
 ```
+**Relaciones de distancias**
+La funcion st_distance nos calcula la distancia entre dos puntos
+Notar que nos dice tambien en que unidades se encuentra esa distancia
+Ademas nos da una matriz de distancia entre diferentes puntos
+
+```{r}
+nz_heighest = nz_height |> slice_max(n = 1, order_by = elevation)
+canterbury_centroid = st_centroid(nz[nz$Name=="Canterbury",])
+st_distance(nz_heighest, canterbury_centroid)
+
+```
+```{r}
+co = filter(nz, grepl("Canter|Otag", Name))
+st_distance(nz_height[1:3, ], co)
+
+```
+```{r}
+plot(st_geometry(co)[2])
+plot(st_geometry(nz_height)[2:3], add = TRUE)
+```
+**Operaciones Geometricas**
+**Simplificacion**
+
+```{r}
+seine_simp = st_simplify(seine, dTolerance = 2000)  # 2000 m
+plot(seine)
+plot(seine_simp)
+```
+
+```{r}
+object.size(seine)
+object.size(seine_simp)
+
+```
+Para poligonos tambien aplica
+```{r}
+us_states2163 = st_transform(us_states, "EPSG:2163")
+us_states2163 = us_states2163
+```
+
+```{r}
+us_states_simp1 = st_simplify(us_states2163, dTolerance = 100000)  # 100 km
+plot(us_states2163)
+plot(us_states_simp1)
+```
+Notar que se pierde la topologia utilizando esta funcion.
+La funcion ms_simplify resuelve esto
+
+```{r}
+# proportion of points to retain (0-1; default 0.05)
+us_states_simp2 = rmapshaper::ms_simplify(us_states2163, keep = 0.01,
+                                          keep_shapes = TRUE)
+```
+```{r}
+plot(us_states_simp2)
+```
+Otra opcion para simplificar es el smooth
+```{r}
+us_states_simp3 = smoothr::smooth(us_states2163, method = 'ksmooth', smoothness = 6)
+```
+
+**Centroides**
+```{r}
+nz_centroid = st_centroid(nz)
+seine_centroid = st_centroid(seine)
+```
+La siguiente funcion garantiza que el centroide caiga sobre el objeto
+```{r}
+nz_pos = st_point_on_surface(nz)
+seine_pos = st_point_on_surface(seine)
+```
+**Buffers**
+```{r}
+seine_buff_5km = st_buffer(seine, dist = 5000)
+seine_buff_50km = st_buffer(seine, dist = 50000)
+```
+
+**Transformaciones**
+Se refiere a la traslacion, rotacion y escalado de los features.
+Para esto se trabaja con la columna geometrica
+
+```{r}
+nz_sfc = st_geometry(nz)
+```
+
+
+Traslacion 100.000 m hacia el norte
+```{r}
+nz_shift = nz_sfc + c(0, 100000)
+```
+
+Para el escalado primero se debe definir un punto desde el cual se realizara el escalado.
+En este caso se utilizo el centroide. Para esto se llevo el centro a 0,0
+
+```{r}
+nz_centroid_sfc = st_centroid(nz_sfc)
+nz_scale = (nz_sfc - nz_centroid_sfc) * 0.5 + nz_centroid_sfc
+```
+
+Para la rotacion se define primero la funcion:
+```{r}
+rotation = function(a){
+  r = a * pi / 180 #degrees to radians
+  matrix(c(cos(r), sin(r), -sin(r), cos(r)), nrow = 2, ncol = 2)
+} 
+```
+
+Luego al igual que el escalado se utiliza un punto de referencia para rotar
+```{r}
+nz_rotate = (nz_sfc - nz_centroid_sfc) * rotation(30) + nz_centroid_sfc
+```
+
+Finalmente se establece la nueva geometria:
+```{r}
+nz_scale_sf = st_set_geometry(nz, nz_scale)
+```
+
+**clip**
+Obtener un nuevo feateure en funcion de la interseccion, union o diferencia de otros dos
+st_intersection
+st_union
+st_difference
+st_sym_difference
+
+```{r}
+b = st_sfc(st_point(c(0, 1)), st_point(c(1, 1))) # create 2 points
+b = st_buffer(b, dist = 1) # convert points to circles
+plot(b, border = "grey")
+text(x = c(-0.5, 1.5), y = 1, labels = c("x", "y"), cex = 3) # add text
+```
+
+```{r}
+x = b[1]
+y = b[2]
+x_and_y = st_intersection(x, y)
+plot(b, border = "grey")
+plot(x_and_y, col = "lightgrey", border = "grey", add = TRUE) # intersecting area
+```
+
+
 
