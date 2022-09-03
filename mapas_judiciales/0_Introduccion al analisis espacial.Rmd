@@ -574,6 +574,67 @@ x_and_y = st_intersection(x, y)
 plot(b, border = "grey")
 plot(x_and_y, col = "lightgrey", border = "grey", add = TRUE) # intersecting area
 ```
+***Subseting y Cliping***
 
+```{r}
+bb = st_bbox(st_union(x, y))
+box = st_as_sfc(bb)
+set.seed(2017)
+p = st_sample(x = box, size = 10)
+x_and_y = st_intersection(x, y)
+```
 
+```{r}
+p_xy1 = p[x_and_y]
+p_xy2 = st_intersection(p, x_and_y)
+sel_p_xy = st_intersects(p, x, sparse = FALSE)[, 1] &
+  st_intersects(p, y, sparse = FALSE)[, 1]
+p_xy3 = p[sel_p_xy]
+```
+
+***Uniones***
+```{r}
+regions = aggregate(x = us_states[, "total_pop_15"], by = list(us_states$REGION),
+                    FUN = sum, na.rm = TRUE)
+regions2 = us_states |> 
+  group_by(REGION) |>
+  summarize(pop = sum(total_pop_15, na.rm = TRUE))
+```
+
+```{r}
+us_west = us_states[us_states$REGION == "West", ]
+us_west_union = st_union(us_west)
+```
+
+```{r}
+texas = us_states[us_states$NAME == "Texas", ]
+texas_union = st_union(us_west_union, texas)
+```
+
+***Transformaciones***
+```{r}
+multipoint = st_multipoint(matrix(c(1, 3, 5, 1, 3, 1), ncol = 2))
+```
+
+```{r}
+linestring = st_cast(multipoint, "LINESTRING")
+polyg = st_cast(multipoint, "POLYGON")
+```
+
+```{r}
+multipoint_2 = st_cast(linestring, "MULTIPOINT")
+multipoint_3 = st_cast(polyg, "MULTIPOINT")
+all.equal(multipoint, multipoint_2)
+#> [1] TRUE
+all.equal(multipoint, multipoint_3)
+#> [1] TRUE
+```
+```{r}
+multilinestring_list = list(matrix(c(1, 4, 5, 3), ncol = 2), 
+                            matrix(c(4, 4, 4, 1), ncol = 2),
+                            matrix(c(2, 4, 2, 2), ncol = 2))
+multilinestring = st_multilinestring(multilinestring_list)
+multilinestring_sf = st_sf(geom = st_sfc(multilinestring))
+multilinestring_sf
+```
 
