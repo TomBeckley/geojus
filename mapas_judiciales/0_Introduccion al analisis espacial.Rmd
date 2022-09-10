@@ -637,4 +637,76 @@ multilinestring = st_multilinestring(multilinestring_list)
 multilinestring_sf = st_sf(geom = st_sfc(multilinestring))
 multilinestring_sf
 ```
+***Proyecciones y Reproyecciones *** 
+
+```{r}
+st_crs("EPSG:4326")
+```
+```{r}
+sf::st_crs("ESRI:54030")
+```
+
+Seteando sistemas de coordenadas
+
+```{r}
+vector_filepath = system.file("shapes/world.gpkg", package = "spData")
+new_vector = read_sf(vector_filepath)
+```
+
+```{r}
+st_crs(new_vector)st_crs(new_vector)
+```
+
+```{r}
+new_vector = st_set_crs(new_vector, "EPSG:4326") # set CRS
+```
+
+```{r}
+raster_filepath = system.file("raster/srtm.tif", package = "spDataLarge")
+my_rast = rast(raster_filepath)
+cat(crs(my_rast)) 
+```
+
+
+```{r}
+crs(my_rast) = "EPSG:26912" # set CRS
+```
+
+```{r}
+london = data.frame(lon = -0.1, lat = 51.5) |> 
+  st_as_sf(coords = c("lon", "lat"))
+st_is_longlat(london)
+#> [1] NA
+```
+
+```{r}
+london_geo = st_set_crs(london, "EPSG:4326")
+st_is_longlat(london_geo)
+```
+
+***Operaciones Geometricas en datos proyectados y sin proyectar***
+
+```{r}
+london_buff_no_crs = st_buffer(london, dist = 1)   
+london_buff_s2 = st_buffer(london_geo, dist = 1e5) 
+london_buff_s2_100_cells = st_buffer(london_geo, dist = 1e5, max_cells = 100) 
+```
+
+```{r}
+sf::sf_use_s2(FALSE)
+london_buff_lonlat = st_buffer(london_geo, dist = 1) # Resultado incorrecto
+
+sf::sf_use_s2(TRUE)
+#Geometria esferica activada
+```
+
+```{r}
+london_proj = data.frame(x = 530000, y = 180000) |> 
+  st_as_sf(coords = 1:2, crs = "EPSG:27700")
+```
+
+```{r}
+st_crs(london_proj)
+```
+
 
