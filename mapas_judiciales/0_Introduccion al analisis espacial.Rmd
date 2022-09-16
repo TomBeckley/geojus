@@ -710,3 +710,119 @@ st_crs(london_proj)
 ```
 
 
+```{r}
+london_buff_projected = st_buffer(london_proj, 1e5)
+```
+
+```{r}
+st_distance(london_geo, london_proj)
+# > Error: st_crs(x) == st_crs(y) is not TRUE
+```
+
+***Que sistema de corrdenadas utilizar***
+```{r}
+lonlat2UTM = function(lonlat) {
+  utm = (floor((lonlat[1] + 180) / 6) %% 60) + 1
+  if(lonlat[2] > 0) {
+    utm + 32600
+  } else{
+    utm + 32700
+  }
+}
+```
+
+
+```{r}
+lonlat2UTM(c(174.7, -36.9))
+#> [1] 32760
+lonlat2UTM(st_coordinates(london))
+#> [1] 32630
+```
+
+```{r}
+london2 = st_transform(london_geo, "EPSG:27700")
+```
+
+```{r}
+st_distance(london2, london_proj)
+```
+
+```{r}
+st_crs(cycle_hire_osm)
+```
+
+```{r}
+crs_lnd = st_crs(london_geo)
+class(crs_lnd)
+names(crs_lnd)
+```
+
+```{r}
+crs_lnd$Name
+crs_lnd$proj4string
+crs_lnd$epsg
+```
+
+```{r}
+cycle_hire_osm_projected = st_transform(cycle_hire_osm, "EPSG:27700")
+st_crs(cycle_hire_osm_projected)
+```
+
+```{r}
+crs_lnd_new = st_crs("EPSG:27700")
+crs_lnd_new$Name
+crs_lnd_new$proj4string
+crs_lnd_new$epsg
+
+```
+
+## Leer y escribir informacion geoespacial
+
+***Open Data***
+```{r}
+download.file(url = "https://hs.pangaea.de/Maps/PeRL/PeRL_permafrost_landscapes.zip",
+              destfile = "PeRL_permafrost_landscapes.zip", 
+              mode = "wb")
+unzip("PeRL_permafrost_landscapes.zip")
+canada_perma_land = read_sf("PeRL_permafrost_landscapes/canada_perma_land.shp")
+```
+
+```{r}
+library(rnaturalearth)
+usa = ne_countries(country = "United States of America") # United States borders
+class(usa)
+```
+
+```{r}
+usa_sf = st_as_sf(usa)
+```
+
+```{r}
+library(geodata)
+worldclim_prec = worldclim_global("prec", res = 10, path = tempdir())
+class(worldclim_prec)
+```
+
+```{r}
+library(osmdata)
+parks = opq(bbox = "leeds uk") |> 
+  add_osm_feature(key = "leisure", value = "park") |> 
+  osmdata_sf()
+```
+
+```{r}
+world2 = spData::world
+world3 = read_sf(system.file("shapes/world.gpkg", package = "spData"))
+```
+
+```{r}
+library(tidygeocoder)
+geo_df = data.frame(address = "54 Frith St, London W1D 4SJ, UK")
+geo_df = geocode(geo_df, address, method = "osm")
+geo_df
+```
+
+```{r}
+geo_sf = st_as_sf(geo_df, coords = c("lat", "long"), crs = "EPSG:4326")
+```
+
