@@ -826,3 +826,80 @@ geo_df
 geo_sf = st_as_sf(geo_df, coords = c("lat", "long"), crs = "EPSG:4326")
 ```
 
+***Servicios web***
+
+```{r}
+library(httr)
+base_url = "http://www.fao.org"
+endpoint = "/figis/geoserver/wfs"
+q = list(request = "GetCapabilities")
+res = GET(url = modify_url(base_url, path = endpoint), query = q)
+res$url
+
+```
+
+```{r}
+txt = content(res, "text")
+xml = xml2::read_xml(txt)
+```
+
+```{r}
+xml
+```
+
+```{r}
+qf = list(request = "GetFeature", typeName = "area:FAO_AREAS")
+file = tempfile(fileext = ".gml")
+GET(url = base_url, path = endpoint, query = qf, write_disk(file))
+fao_areas = read_sf(file)
+```
+
+
+***Data Input***
+```{r}
+sf_drivers = st_drivers()
+head(sf_drivers, n = 3)
+summary(sf_drivers[-c(1:2)])
+```
+
+```{r}
+f = system.file("shapes/world.gpkg", package = "spData")
+world = read_sf(f, quiet = TRUE)
+```
+
+```{r}
+tanzania = read_sf(f, query = 'SELECT * FROM world WHERE name_long = "Tanzania"')
+```
+
+```{r}
+tanzania_buf = st_buffer(tanzania, 50000)
+tanzania_buf_geom = st_geometry(tanzania_buf)
+tanzania_buf_wkt = st_as_text(tanzania_buf_geom)
+```
+
+```{r}
+tanzania_neigh = read_sf(f, wkt_filter = tanzania_buf_wkt)
+```
+
+```{r}
+cycle_hire_txt = system.file("misc/cycle_hire_xy.csv", package = "spData")
+cycle_hire_xy = read_sf(cycle_hire_txt,
+  options = c("X_POSSIBLE_NAMES=X", "Y_POSSIBLE_NAMES=Y"))
+```
+
+```{r}
+world_txt = system.file("misc/world_wkt.csv", package = "spData")
+world_wkt = read_sf(world_txt, options = "GEOM_POSSIBLE_NAMES=WKT")
+# the same as
+world_wkt2 = st_read(world_txt, options = "GEOM_POSSIBLE_NAMES=WKT", 
+                    quiet = TRUE, stringsAsFactors = FALSE, as_tibble = TRUE)
+```
+
+```{r}
+u = "https://developers.google.com/kml/documentation/KML_Samples.kml"
+download.file(u, "KML_Samples.kml")
+st_layers("KML_Samples.kml")
+#
+kml = read_sf("KML_Samples.kml", layer = "Placemarks")
+```
+
