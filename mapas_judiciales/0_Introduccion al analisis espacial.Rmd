@@ -903,3 +903,101 @@ st_layers("KML_Samples.kml")
 kml = read_sf("KML_Samples.kml", layer = "Placemarks")
 ```
 
+
+# Making Maps
+***tm basics***
+```{r}
+tm_shape(nz) +
+  tm_fill() 
+tm_shape(nz) +
+  tm_borders() 
+tm_shape(nz) +
+  tm_fill() +
+  tm_borders() 
+```
+
+
+**Objetos de mapas**
+```{r}
+map_nz = tm_shape(nz) + tm_polygons()
+class(map_nz)
+```
+
+```{r}
+map_nz1 = map_nz +
+  tm_shape(nz_elev) + tm_raster(alpha = 0.7)
+```
+
+```{r}
+nz_water = st_union(nz) |> st_buffer(22200) |> 
+  st_cast(to = "LINESTRING")
+map_nz2 = map_nz1 +
+  tm_shape(nz_water) + tm_lines()
+```
+
+```{r}
+map_nz3 = map_nz2 +
+  tm_shape(nz_height) + tm_dots()
+```
+
+```{r}
+tmap_arrange(map_nz1, map_nz2, map_nz3)
+```
+
+***Apariencia de los mapas***
+
+```{r}
+ma1 = tm_shape(nz) + tm_fill(col = "red")
+ma2 = tm_shape(nz) + tm_fill(col = "red", alpha = 0.3)
+ma3 = tm_shape(nz) + tm_borders(col = "blue")
+ma4 = tm_shape(nz) + tm_borders(lwd = 3)
+ma5 = tm_shape(nz) + tm_borders(lty = 2)
+ma6 = tm_shape(nz) + tm_fill(col = "red", alpha = 0.3) +
+  tm_borders(col = "blue", lwd = 3, lty = 2)
+tmap_arrange(ma1, ma2, ma3, ma4, ma5, ma6)
+```
+
+```{r}
+plot(st_geometry(nz), col = nz$Land_area)  # works
+tm_shape(nz) + tm_fill(col = nz$Land_area) # fails
+```
+
+```{r}
+tm_shape(nz) + tm_fill(col = "Land_area")
+```
+
+```{r}
+legend_title = expression("Area (km"^2*")")
+map_nza = tm_shape(nz) +
+  tm_fill(col = "Land_area", title = legend_title) + tm_borders()
+```
+
+***Colores***
+```{r}
+tm_shape(nz) + tm_polygons(col = "Median_income")
+breaks = c(0, 3, 4, 5) * 10000
+tm_shape(nz) + tm_polygons(col = "Median_income", breaks = breaks)
+tm_shape(nz) + tm_polygons(col = "Median_income", n = 10)
+tm_shape(nz) + tm_polygons(col = "Median_income", palette = "BuGn")
+```
+
+```{r}
+tm_shape(nz) + tm_polygons("Population", palette = "Blues")
+tm_shape(nz) + tm_polygons("Population", palette = "YlOrBr")
+```
+
+***Capas***
+```{r}
+map_nz + 
+  tm_compass(type = "8star", position = c("left", "top")) +
+  tm_scale_bar(breaks = c(0, 100, 200), text.size = 1)
+```
+
+
+```{r}
+map_nz + tm_layout(title = "New Zealand")
+map_nz + tm_layout(scale = 5)
+map_nz + tm_layout(bg.color = "lightblue")
+map_nz + tm_layout(frame = FALSE)
+```
+
