@@ -1,0 +1,175 @@
+---
+title: "Cartografía Estadística Judicial"
+author: "Tomás E. Beckley"
+date: "2022-12-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, cache=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Librerías
+```{r message=FALSE}
+library(latticeExtra)
+library(dplyr)
+library(tidyr)
+library(rgdal) # Librería para poder abrir archivos shapefiles
+library(broom)
+library(precrec) # Transformar el archivo shapefile a dataframe
+library(ggplot2)
+library(sp)      # Paquete para manipular datos espaciales
+library(RColorBrewer) # Paleta de colores
+```
+
+Directorio
+```{r}
+setwd("D:\\Tom's\\1 - PASANTIAS\\") # en esta carpeta se encuentran los archivs shapefile
+```
+
+
+### EXTRACCIÓN DE LA INFORMACIÓN
+
+Se utilizarán dos tipos de información:
+  - Información espacial provista por Catastro Provincial de la Provincia de Entre Ríos. (Shapefiles  de departamentos y        distritos de la provincia.)
+  - Información alfanumérica extraída del Area de Planificación, Gestión y Estadística STJER. (Número de sentencias por         circunscripción y organismo)
+
+Posteriormente se procede a unificar esta información en una misma capa y luego a plotearlo en un mapa temático.
+
+***Información del STJER***
+
+```{r}
+produccion = readRDS("D:/Tom's/1 - PASANTIAS/geojus/data/produccion.rds") #Directorio de trabajo
+```
+
+
+```{r}
+tabla<-produccion %>% 
+  filter(tproducto == "sentencias", circunscripcion != "-") %>%
+  group_by(circunscripcion, organismo) %>% 
+  summarise(cantidad = sum(cantidad, na.rm = T))
+tabla
+```
+Se observan las distintas circunscripciones.
+```{r}
+unique(tabla$circunscripcion)
+```
+
+***Informacion espacial***
+
+Carga de la informacion espacial a partir de los datos provistos por Catastro Provincial.
+Previamente se trató la informacion provista utilizando un software de Sistema de informacióm Geográfica libre, en este caso QGis para obtener las circunscripciones de Chajarí y Federación según lo estipula la Ley 8309 - B.O. 18/01/91.
+
+```{r}
+circ <- readOGR( 
+  dsn= paste0(getwd(),"/") , 
+  layer="merge",
+  verbose=FALSE
+)
+```
+
+```{r}
+summary(circ) # Resumen sobre la capa
+length(circ) # Cantidad de features, entidades o departamentos
+head(circ@data) # Nombre de los departamentos
+```
+
+Se observa que los nombres de circunscripciones tanto para la capa de información espacial como la tabla de sentencias contengan la misma cantidad de circunscripciones.
+
+```{r}
+dep<-unique(circ@data)$departamen
+orden<-order(unique(circ@data)$departamen)
+dep[orden]
+```
+```{r}
+unique(tabla$circunscripcion)
+```
+
+Se debe eliminar Entre Ríos de la tabla alfanumerica antes de hacer un join.
+
+```{r}
+data<-tabla[tabla$circunscripcion!="Entre Ríos",]
+data
+```
+
+A continuación, debido a que cada circunscripción tiene diferentes organismos, se procede a sumarlos.
+
+Si se desea generar otro tipo de mapa, se debe filtrar esta información alfanumerica primero.
+Para este caso se mostrará el total de sentencias por circunscripción sin importar los organismos involucrados.
+
+```{r}
+data_tot<- data %>% group_by(circunscripcion) %>% 
+  summarise(cantidad = sum(cantidad, na.rm = T))
+data_tot
+```
+
+***Unión de la informacion***
+
+```{r}
+dataf <- merge(circ, data_tot, by.x="departamen", by.y="circunscripcion")
+dataf@data
+```
+
+Ya tenemos nuestra capa de información geografica lista para ser mapeada. A continuació se verán dos formas de plotear, una utilizando R base con la ayuda del paquete "sp" y otra transformando a dataframe el shapefile y utilizando ggplot2
+
+
+### Mapeo de la Información Geográfica
+
+Se puede utilizar R base para plotear la capa espacial:
+
+```{r}
+par(mar=c(0,0,0,0))
+plot(dataf, col="#f2f2f2", bg="gray", lwd=0.25, border=0 )
+```
+Se plotea la cantidad de sentencias por circunscripcón:
+```{r}
+spplot(dataf[,2], bg="gray", lwd=0.25, border=0)
+```
+Se utilza otra paleta de colores
+```{r}
+colors<-brewer.pal(9,"Blues")
+spplot(dataf[,2],col.regions=colors,cuts=8, 
+       main="Total sentencias por circunscripción, Provincia de Entre Ríos 2022",
+       scales=list(draw=T)
+       )
+```
+Para la escala grafica y norte:
+```{r}
+#Escala gráfica.
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(5450000,6215000), scale = 100000, fill=c("transparent","black"))
+  text1 = list("sp.text", c(5450000,6235000), "0")
+  text2 = list("sp.text", c(5550000,6235000), "100 km")
+#Flecha de norte.
+arrow = list("SpatialPolygonsRescale", layout.north.arrow(), 
+    offset = c(5450000,6620000), scale = 40000)
+
+spplot(dataf[,2],col.regions=colors,cuts=8, sp.layout=list(scale,text1,text2,arrow),
+       main="Total sentencias por circunscripción, Provincia de Entre Ríos 2022",
+       scales=list(draw=T),
+       xlim=c(5400000,5750000),
+       ylim=c(6200000,6700000),
+       )
+```
+
+***Plotear con GGplot2***
+Si se desea mapear con ggplot, se debe transformar primero la capa a dataframe, obteniendose una tabla con las coordenadas e informacion alfanumerica para cada circunscripcion:
+
+```{r}
+dataf2 <- fortify(dataf, region="departamen")
+```
+
+```{r}
+dataf3 <- merge(dataf2, data_tot, by.x="id", by.y="circunscripcion")
+head(dataf3)
+```
+
+
+```{r}
+gg <- ggplot() 
+
+# This line will bring in the drought shapefile
+gg <- gg +  geom_polygon(data = dataf3, aes(x=long, y=lat, group=group, fill=cantidad), color = "white", size=0) 
+gg
+```
+
